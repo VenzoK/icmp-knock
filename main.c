@@ -3,12 +3,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/ip_icmp.h>
+#include <netdb.h>
 #define DEST_IP_BUFF 100
 #define SRC_IP_BUFF 100
-#define ICMP_BUFF 10 // ICMP header size
+#define ICMP_BUFF 8 // ICMP header size
 #define RCVD_MSG_BUFF 1024
 #define FQDN_BUFF 100
 int create_socket(char* dest_IP_str, struct sockaddr_in* dest_addr, int dest_addr_size)
@@ -86,6 +88,39 @@ void construct_packet(int sock_fd, void* packet, int seq_number, int ttl)
         memcpy(packet, &icmp_hdr, sizeof(struct icmphdr));
 }
 
+void resolve_FQDN(char* FQDN, char* output, int output_size)
+{
+	// FQDN resolution
+        struct addrinfo* result;
+        int status = getaddrinfo(FQDN, NULL, NULL, &result);
+        if(status != 0)
+        {
+                fprintf(stderr, "FQDN resolution error: %s\n", gai_strerror(status));
+                exit(1);
+        }
+
+        struct addrinfo* p;
+        void* addr;
+        struct sockaddr_in* ipv4;
+        for(p = result; p != NULL; p = p->ai_next)
+        {
+                // The first entry with an IPv4 address for the provided FQDN is selected.
+		if(p->ai_family == AF_INET) // IPv4
+                {
+                        ipv4 = (struct sockaddr_in*)p->ai_addr;
+                        addr = &(ipv4->sin_addr);
+                        break;
+                }
+                else
+                {
+                        continue;
+                }
+        }
+        inet_ntop(p->ai_family, addr, output, output_size);
+        
+        freeaddrinfo(result);
+}
+
 int main(int argc, char* argv[])
 {
 	char dest_IP_str[DEST_IP_BUFF];
@@ -101,7 +136,9 @@ int main(int argc, char* argv[])
         int seq_number = 1; // For sending multiple messages
         int sock_fd;
 
-        strcpy(dest_IP_str, argv[1]);
+        resolve_FQDN(argv[1], dest_IP_str, sizeof(dest_IP_str));
+        printf("Dest ip: %s\n", dest_IP_str);
+
         sock_fd = create_socket(dest_IP_str, &dest_IP, dest_IP_size);
         construct_packet(sock_fd, packet, seq_number, ttl);
         send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
