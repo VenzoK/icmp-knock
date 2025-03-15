@@ -13,6 +13,8 @@
 #define ICMP_BUFF 8 // ICMP header size
 #define RCVD_MSG_BUFF 1024
 #define FQDN_BUFF 100
+#define MAX_HOPS 30
+#define MAX_SEQ_NUMBER 3
 int create_socket(struct sockaddr_in* dest_addr)
 {
         // Socket creation
@@ -118,6 +120,12 @@ void resolve_FQDN(char* FQDN, struct sockaddr_in* dest_addr, char* dest_addr_str
         freeaddrinfo(result);
 }
 
+int packet_timed_out(int sock_fd)
+{
+        // TODO: implement timeout function
+        return 0;
+}
+
 int main(int argc, char* argv[])
 {
 	char dest_IP_str[DEST_IP_BUFF];
@@ -134,15 +142,39 @@ int main(int argc, char* argv[])
         int sock_fd;
 
 	resolve_FQDN(argv[1], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
-        printf("Dest ip: %s\n", dest_IP_str);
+        printf("Destination ip: %s, %d hops max\n", dest_IP_str, MAX_HOPS);
 
         sock_fd = create_socket(&dest_IP);
-        construct_packet(sock_fd, packet, seq_number, ttl);
-        send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
-        recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
-        strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
-        printf("Reply from %s, TTL: %d\n", src_IP_str, ttl);
-        
+        while(ttl <= MAX_HOPS)
+        {
+                printf("%d.\t", ttl);
+                for(seq_number = 0; seq_number < MAX_SEQ_NUMBER; seq_number++)
+                {
+                        construct_packet(sock_fd, packet, seq_number, ttl);
+                        send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
+                        if(packet_timed_out(sock_fd))
+                        {
+                                printf("* ");
+                        }
+                        else
+                        {
+                                recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
+                                strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
+                                printf("Reply from %s\n", src_IP_str);
+                                break;
+                        }
+                        if(seq_number == MAX_SEQ_NUMBER-1)
+                        {
+                                printf("\n");
+                        }
+
+                }
+                if(memcmp(&dest_IP.sin_addr, &node_IP.sin_addr, sizeof(dest_IP.sin_addr)) == 0)        
+                {
+                        break;
+                }
+                ttl++;
+        }
         close(sock_fd);
 
 
