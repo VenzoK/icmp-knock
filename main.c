@@ -13,7 +13,7 @@
 #define ICMP_BUFF 8 // ICMP header size
 #define RCVD_MSG_BUFF 1024
 #define FQDN_BUFF 100
-int create_socket(char* dest_IP_str, struct sockaddr_in* dest_addr, int dest_addr_size)
+int create_socket(struct sockaddr_in* dest_addr)
 {
         // Socket creation
 	int sock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
@@ -23,13 +23,11 @@ int create_socket(char* dest_IP_str, struct sockaddr_in* dest_addr, int dest_add
 		exit(1);
 	};
 	// Socket configuring
-	memset(dest_addr, 0, dest_addr_size);
 	dest_addr->sin_family = AF_INET;
-	dest_addr->sin_addr.s_addr = inet_addr(dest_IP_str);
 	dest_addr->sin_port = 0;
 
         return sock_fd;
-}
+}	
 
 void send_packet(int sock_fd, const void* packet, int packet_size, struct sockaddr* dest, int dest_size)
 {
@@ -88,7 +86,7 @@ void construct_packet(int sock_fd, void* packet, int seq_number, int ttl)
         memcpy(packet, &icmp_hdr, sizeof(struct icmphdr));
 }
 
-void resolve_FQDN(char* FQDN, char* output, int output_size)
+void resolve_FQDN(char* FQDN, struct sockaddr_in* dest_addr, char* dest_addr_str, int dest_addr_str_size)
 {
 	// FQDN resolution
         struct addrinfo* result;
@@ -100,7 +98,6 @@ void resolve_FQDN(char* FQDN, char* output, int output_size)
         }
 
         struct addrinfo* p;
-        void* addr;
         struct sockaddr_in* ipv4;
         for(p = result; p != NULL; p = p->ai_next)
         {
@@ -108,7 +105,7 @@ void resolve_FQDN(char* FQDN, char* output, int output_size)
 		if(p->ai_family == AF_INET) // IPv4
                 {
                         ipv4 = (struct sockaddr_in*)p->ai_addr;
-                        addr = &(ipv4->sin_addr);
+                        dest_addr->sin_addr = ipv4->sin_addr;
                         break;
                 }
                 else
@@ -116,7 +113,7 @@ void resolve_FQDN(char* FQDN, char* output, int output_size)
                         continue;
                 }
         }
-        inet_ntop(p->ai_family, addr, output, output_size);
+        inet_ntop(p->ai_family, &ipv4->sin_addr, dest_addr_str, dest_addr_str_size);
         
         freeaddrinfo(result);
 }
@@ -136,10 +133,10 @@ int main(int argc, char* argv[])
         int seq_number = 1; // For sending multiple messages
         int sock_fd;
 
-        resolve_FQDN(argv[1], dest_IP_str, sizeof(dest_IP_str));
+	resolve_FQDN(argv[1], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
         printf("Dest ip: %s\n", dest_IP_str);
 
-        sock_fd = create_socket(dest_IP_str, &dest_IP, dest_IP_size);
+        sock_fd = create_socket(&dest_IP);
         construct_packet(sock_fd, packet, seq_number, ttl);
         send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
         recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
