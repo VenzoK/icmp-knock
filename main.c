@@ -15,6 +15,8 @@
 #define FQDN_BUFF 100
 #define MAX_HOPS 30
 #define MAX_SEQ_NUMBER 3
+#define TIMEOUT_SEC 0
+#define TIMEOUT_MICROSEC 500000
 int create_socket(struct sockaddr_in* dest_addr)
 {
         // Socket creation
@@ -122,8 +124,19 @@ void resolve_FQDN(char* FQDN, struct sockaddr_in* dest_addr, char* dest_addr_str
 
 int packet_timed_out(int sock_fd)
 {
-        // TODO: implement timeout function
-        return 0;
+        fd_set fds;
+        int status;
+        struct timeval timeout;
+        timeout.tv_sec = TIMEOUT_SEC;
+        timeout.tv_usec = TIMEOUT_MICROSEC;
+        FD_ZERO(&fds);
+        FD_SET(sock_fd, &fds);
+        status = select(sock_fd+1, &fds, NULL, NULL, &timeout);
+        if(status < 0)
+        {
+                perror("Error: timeout failed.");
+        }
+        return !status;
 }
 
 int main(int argc, char* argv[])
