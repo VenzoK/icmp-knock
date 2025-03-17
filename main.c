@@ -122,6 +122,15 @@ void resolve_FQDN(char* FQDN, struct sockaddr_in* dest_addr, char* dest_addr_str
         freeaddrinfo(result);
 }
 
+void reverse_FQDN_resolve(struct sockaddr* node_IP, int node_IP_size, char* FQDN, int FQDN_size)
+{
+        int status = getnameinfo(node_IP, node_IP_size, FQDN, FQDN_size, NULL, 0, NI_NAMEREQD);
+        if(status != 0)
+        {
+                strcpy(FQDN, "Unknown");
+        }
+}
+
 int packet_timed_out(int sock_fd)
 {
         fd_set fds;
@@ -172,8 +181,9 @@ int main(int argc, char* argv[])
                         else
                         {
                                 recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
+                                reverse_FQDN_resolve((struct sockaddr*)&node_IP, sizeof(node_IP), FQDN, sizeof(FQDN));
                                 strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
-                                printf("Reply from %s\n", src_IP_str);
+                                printf("Reply from %s (%s)\n", FQDN, src_IP_str);
                                 break;
                         }
                         if(seq_number == MAX_SEQ_NUMBER-1)
