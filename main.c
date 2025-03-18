@@ -75,9 +75,18 @@ uint16_t checksum(void* packet, int length)
         return result;
 }
 
-void construct_packet(int sock_fd, void* packet, int seq_number, int ttl)
+void construct_packet(int sock_fd, void* packet, int seq_number, int ttl, char* interface)
 {
         struct icmphdr icmp_hdr;
+
+        if(interface != NULL)
+        {
+                if(setsockopt(sock_fd, SOL_SOCKET, SO_BINDTODEVICE, interface, strlen(interface)) != 0)
+                {
+                        perror("Error: binding socket to interface failed.");
+                        exit(1);
+                }
+        }
 
         setsockopt(sock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
 
@@ -156,6 +165,7 @@ int main(int argc, char* argv[])
         char packet[ICMP_BUFF];
         char rcvd_msg[RCVD_MSG_BUFF];
         char FQDN[FQDN_BUFF]; // For further reverse FQDN resolution
+        char* interface = (argc > 2) ? argv[2] : NULL;
         struct sockaddr_in dest_IP;
         struct sockaddr_in node_IP;
         struct timeval time_start;
@@ -168,6 +178,12 @@ int main(int argc, char* argv[])
         int first_reply = 1;
         long double rtt;
 
+        if(argc > 3 || argc < 2)
+        {
+                fprintf(stderr, "Usage: %s <Destination FQDN> [interface]\n", argv[0]);
+                exit(1);
+        }
+
 	resolve_FQDN(argv[1], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
         printf("Destination ip: %s, %d hops max\n", dest_IP_str, MAX_HOPS);
 
@@ -177,7 +193,7 @@ int main(int argc, char* argv[])
                 printf("%d.\t", ttl);
                 for(seq_number = 0; seq_number < MAX_SEQ_NUMBER; seq_number++)
                 {
-                        construct_packet(sock_fd, packet, seq_number, ttl);
+                        construct_packet(sock_fd, packet, seq_number, ttl, interface);
                         gettimeofday(&time_start, NULL);
                         send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
                         if(packet_timed_out(sock_fd))
