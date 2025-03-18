@@ -12,10 +12,10 @@
 #define DEST_IP_BUFF 100
 #define SRC_IP_BUFF 100
 #define ICMP_BUFF 8 // ICMP header size
-#define RCVD_MSG_BUFF 1024
-#define FQDN_BUFF 100
+#define RCVD_MSG_BUFF 512
+#define FQDN_BUFF 512
 #define MAX_HOPS 30
-#define MAX_SEQ_NUMBER 3
+#define PACKETS_PER_TTL 3
 #define TIMEOUT_SEC 0
 #define TIMEOUT_MICROSEC 500000
 int create_socket(struct sockaddr_in* dest_addr)
@@ -161,22 +161,23 @@ int packet_timed_out(int sock_fd)
 int main(int argc, char* argv[])
 {
 	char dest_IP_str[DEST_IP_BUFF];
-        char src_IP_str[SRC_IP_BUFF];
-        char packet[ICMP_BUFF];
+        char src_IP_str[SRC_IP_BUFF]; 
+        char packet[ICMP_BUFF]; // ICMP packet buffer(IPv4 payload)
         char rcvd_msg[RCVD_MSG_BUFF];
-        char FQDN[FQDN_BUFF]; // For further reverse FQDN resolution
-        char* interface = (argc > 2) ? argv[2] : NULL;
-        struct sockaddr_in dest_IP;
+        char FQDN[FQDN_BUFF]; 
+        char* interface = (argc > 2) ? argv[2] : NULL; 
+        struct sockaddr_in dest_IP; 
         struct sockaddr_in node_IP;
         struct timeval time_start;
         struct timeval time_end;
         int node_IP_size = sizeof(node_IP);
         int dest_IP_size = sizeof(dest_IP);
-        int ttl = 1; // Different TTLs to track intermediate nodes
-        int seq_number = 1; // For sending multiple messages
-        int sock_fd;
-        int first_reply = 1;
-        long double rtt;
+        int sock_fd; 
+        int ttl = 1; // IPv4 time to live
+        int seq_number = 1; // ICMP sequence number
+        int first_reply = 1; // To print FQDN and IP address of an intermediate node just once
+        int line_overflow = 0; // To keep track of how many packets per TTL value is sent out
+        long double rtt; // Round trip time
 
         if(argc > 3 || argc < 2)
         {
@@ -190,8 +191,8 @@ int main(int argc, char* argv[])
         sock_fd = create_socket(&dest_IP);
         while(ttl <= MAX_HOPS)
         {
-                printf("%d.\t", ttl);
-                for(seq_number = 0; seq_number < MAX_SEQ_NUMBER; seq_number++)
+                printf("%d.\t Reply from ", ttl);
+                for(line_overflow = 0; line_overflow < PACKETS_PER_TTL; line_overflow++)
                 {
                         construct_packet(sock_fd, packet, seq_number, ttl, interface);
                         gettimeofday(&time_start, NULL);
@@ -205,22 +206,20 @@ int main(int argc, char* argv[])
                                 recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
                                 gettimeofday(&time_end, NULL);
                                 rtt = ((long double)time_end.tv_sec - (long double)time_start.tv_sec)*1000.0 + ((long double)time_end.tv_usec - (long double)time_start.tv_usec)/1000;
+                                reverse_FQDN_resolve((struct sockaddr*)&node_IP, sizeof(node_IP), FQDN, sizeof(FQDN));
+                                strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
                                 if(first_reply)
                                 {
-                                        reverse_FQDN_resolve((struct sockaddr*)&node_IP, sizeof(node_IP), FQDN, sizeof(FQDN));
-                                        strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
-                                        printf("Reply from %s (%s) ", FQDN, src_IP_str);
+                                        printf("%s (%s) ", FQDN, src_IP_str);
                                         first_reply = 0;
                                 }
                                 printf("%.3Lf ms ", rtt);
                         }
-                        if(seq_number == MAX_SEQ_NUMBER-1)
-                        {
-                                first_reply = 1;
-                                printf("\n");
-                        }
-
+                        seq_number++;
                 }
+                printf("\n");
+                first_reply = 1;
+
                 if(memcmp(&dest_IP.sin_addr, &node_IP.sin_addr, sizeof(dest_IP.sin_addr)) == 0)        
                 {
                         break;
