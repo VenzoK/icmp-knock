@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -157,11 +158,15 @@ int main(int argc, char* argv[])
         char FQDN[FQDN_BUFF]; // For further reverse FQDN resolution
         struct sockaddr_in dest_IP;
         struct sockaddr_in node_IP;
+        struct timeval time_start;
+        struct timeval time_end;
         int node_IP_size = sizeof(node_IP);
         int dest_IP_size = sizeof(dest_IP);
         int ttl = 1; // Different TTLs to track intermediate nodes
         int seq_number = 1; // For sending multiple messages
         int sock_fd;
+        int first_reply = 1;
+        long double rtt;
 
 	resolve_FQDN(argv[1], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
         printf("Destination ip: %s, %d hops max\n", dest_IP_str, MAX_HOPS);
@@ -173,6 +178,7 @@ int main(int argc, char* argv[])
                 for(seq_number = 0; seq_number < MAX_SEQ_NUMBER; seq_number++)
                 {
                         construct_packet(sock_fd, packet, seq_number, ttl);
+                        gettimeofday(&time_start, NULL);
                         send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
                         if(packet_timed_out(sock_fd))
                         {
@@ -181,13 +187,20 @@ int main(int argc, char* argv[])
                         else
                         {
                                 recv_packet(sock_fd, rcvd_msg, sizeof(rcvd_msg), (struct sockaddr*)&node_IP, &node_IP_size);
-                                reverse_FQDN_resolve((struct sockaddr*)&node_IP, sizeof(node_IP), FQDN, sizeof(FQDN));
-                                strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
-                                printf("Reply from %s (%s)\n", FQDN, src_IP_str);
-                                break;
+                                gettimeofday(&time_end, NULL);
+                                rtt = ((long double)time_end.tv_sec - (long double)time_start.tv_sec)*1000.0 + ((long double)time_end.tv_usec - (long double)time_start.tv_usec)/1000;
+                                if(first_reply)
+                                {
+                                        reverse_FQDN_resolve((struct sockaddr*)&node_IP, sizeof(node_IP), FQDN, sizeof(FQDN));
+                                        strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
+                                        printf("Reply from %s (%s) ", FQDN, src_IP_str);
+                                        first_reply = 0;
+                                }
+                                printf("%.3Lf ms ", rtt);
                         }
                         if(seq_number == MAX_SEQ_NUMBER-1)
                         {
+                                first_reply = 1;
                                 printf("\n");
                         }
 
