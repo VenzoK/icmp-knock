@@ -11,7 +11,7 @@
 #include <netdb.h>
 #define DEST_IP_BUFF 100
 #define SRC_IP_BUFF 100
-#define ICMP_BUFF 8 // ICMP header size
+#define ICMP_BUFF 40 // ICMP header size(8) + the payload(32)
 #define RCVD_MSG_BUFF 512
 #define FQDN_BUFF 512
 #define MAX_HOPS 30
@@ -57,7 +57,7 @@ void recv_packet(int sock_fd, char* rcvd_msg, int rcvd_msg_size, struct sockaddr
 uint16_t checksum(void* packet, int length)
 {
         uint16_t* buff = (uint16_t*)packet;
-        uint16_t sum = 0;
+        uint32_t sum = 0;
         uint16_t result;
 
         for(; length > 1; length -= 2)
@@ -77,7 +77,8 @@ uint16_t checksum(void* packet, int length)
 
 void construct_packet(int sock_fd, void* packet, int seq_number, int ttl, char* interface)
 {
-        struct icmphdr icmp_hdr;
+        struct icmphdr icmp_hdr = {0};
+        char* payload = "abcdefghijklmnopqrstuvwxyz012345"; // constant payload works fine
 
         if(interface != NULL)
         {
@@ -90,14 +91,17 @@ void construct_packet(int sock_fd, void* packet, int seq_number, int ttl, char* 
 
         setsockopt(sock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
 
-        // ICMP header initialization
-        icmp_hdr.type = ICMP_ECHO;
-        icmp_hdr.code = 0;
-        icmp_hdr.un.echo.id = getpid();
-        icmp_hdr.un.echo.sequence = seq_number;
-        icmp_hdr.checksum = 0;
-        icmp_hdr.checksum = checksum((unsigned short*)&icmp_hdr, sizeof(struct icmphdr));
         memcpy(packet, &icmp_hdr, sizeof(struct icmphdr));
+        memcpy(packet+sizeof(struct icmphdr), payload, sizeof(payload));
+        struct icmphdr* icmp_hdr_ptr = (struct icmphdr*)packet;
+
+        // ICMP header initialization
+        icmp_hdr_ptr->type = ICMP_ECHO;
+        icmp_hdr_ptr->code = 0;
+        icmp_hdr_ptr->un.echo.id = getpid();
+        icmp_hdr_ptr->un.echo.sequence = seq_number;
+        icmp_hdr_ptr->checksum = 0;
+        icmp_hdr_ptr->checksum = checksum((unsigned short*)packet, ICMP_BUFF);
 }
 
 void resolve_FQDN(char* FQDN, struct sockaddr_in* dest_addr, char* dest_addr_str, int dest_addr_str_size)
