@@ -23,7 +23,7 @@ Installation:
 
 Linux:
 1. Clone the repository:
-   git clone https://github.com/your-repository/icmp-knock.git
+   git clone https://github.com/VenzoK/icmp-knock.git
    cd icmp-knock
 
 2. Build the utility:
@@ -35,11 +35,11 @@ Linux:
 After building, the executable icmp-knock will be in the current directory.
 
 OpenWRT:
-1. Clone the repository into your OpenWRT build directory:
-   git clone https://github.com/your-repository/icmp-knock.git
+1. Clone the repository:
+   git clone https://github.com/VenzoK/icmp-knock.git
    cd icmp-knock
 
-2. Copy the Makefile into the OpenWRT package/icmp-knock/ directory.
+2. Copy the openwrt/Makefile and icmp-knock.c into the OpenWRT package/icmp-knock/ directory.
 
 3. Build the package using OpenWRT's build system:
    make package/icmp-knock/compile
@@ -54,7 +54,7 @@ Linux Usage:
 To run icmp-knock, use the following command:
    ./icmp-knock <destination_FQDN> [interface]
 
-   - <destination_FQDN>: The Fully Qualified Domain Name (FQDN) of the target (e.g., google.com).
+   - <destination_FQDN>: The Fully Qualified Domain Name (FQDN) or IP address of the target (e.g., google.com).
    - [interface]: (Optional) The network interface to bind to, like eth0 or wlan0. If not specified, the default interface is used.
 
 Example:
