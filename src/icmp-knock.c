@@ -44,7 +44,7 @@ void send_packet(int sock_fd, const void* packet, int packet_size, struct sockad
         }
 }
 
-void recv_packet(int sock_fd, char* rcvd_msg, int rcvd_msg_size, struct sockaddr* node_IP, int* node_IP_size)
+void recv_packet(int sock_fd, char* rcvd_msg, int rcvd_msg_size, struct sockaddr* node_IP, unsigned int* node_IP_size)
 {
         int data_recvd = recvfrom(sock_fd, rcvd_msg, rcvd_msg_size, 0, node_IP, node_IP_size);
         if(data_recvd < 0)
@@ -92,7 +92,7 @@ void construct_packet(int sock_fd, void* packet, int seq_number, int ttl, char* 
         setsockopt(sock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
 
         memcpy(packet, &icmp_hdr, sizeof(struct icmphdr));
-        memcpy(packet+sizeof(struct icmphdr), payload, sizeof(payload));
+        memcpy(packet+sizeof(struct icmphdr), payload, strlen(payload));
         struct icmphdr* icmp_hdr_ptr = (struct icmphdr*)packet;
 
         // ICMP header initialization
@@ -158,6 +158,7 @@ int packet_timed_out(int sock_fd)
         if(status < 0)
         {
                 perror("Error: timeout failed.");
+                exit(1);
         }
         return !status;
 }
@@ -174,8 +175,8 @@ int main(int argc, char* argv[])
         struct sockaddr_in node_IP;
         struct timeval time_start;
         struct timeval time_end;
-        int node_IP_size = sizeof(node_IP);
-        int dest_IP_size = sizeof(dest_IP);
+        unsigned int node_IP_size = sizeof(node_IP);
+        unsigned int dest_IP_size = sizeof(dest_IP);
         int sock_fd; 
         int ttl = 1; // IPv4 time to live
         int seq_number = 1; // ICMP sequence number
