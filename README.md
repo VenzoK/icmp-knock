@@ -6,7 +6,7 @@ This utility works on both Linux and OpenWRT.
 
 Overview:
 
-icmp-knock works by sending ICMP Echo Request packets to a destination, incrementing the TTL (Time-To-Live) for each packet. This allows it to trace the network route and measure the RTT for each hop. It also attempts to resolve Fully Qualified Domain Names (FQDNs) for each hop when possible.
+icmp-knock works by sending ICMP Echo Request packets to a destination, incrementing the TTL (Time-To-Live) for each packet. This allows it to trace the network route and measure the RTT for each hop. It also attempts to resolve Fully Qualified Domain Names (FQDNs) for each hop when possible. The utility sends ICMP packets via a raw socket, which require root privileges to be used.
 
 ---
 
@@ -48,6 +48,22 @@ OpenWRT:
 
 ---
 
+Makefile targets:
+
+    all: Compile the source code to create the icmp-knock executable.
+
+    clean: Remove the compiled binary (icmp-knock).
+
+    test: Run both the icmp-knock utility and traceroute for comparison.
+
+    install: Install icmp-knock to /usr/local/bin for global access.
+
+    uninstall: Remove icmp-knock from /usr/local/bin.
+
+    help: Display the help message with information about each target.
+
+---
+
 Usage:
 
 Linux Usage:
@@ -78,9 +94,10 @@ A test script is available to compare the output of icmp-knock with traceroute.
 
 To run the test script:
 1. Ensure icmp-knock and traceroute are installed.
-2. Run the test script with a target destination:
-   ./test/traceroute_test.sh <target_FQDN>
+2. Run the test script via a makefile target:
+   make test TARGET=<target_FQDN>
 
 The script runs both utilities and outputs their results for comparison.
+
 
 ---
