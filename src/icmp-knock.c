@@ -14,10 +14,10 @@
 #define ICMP_BUFF 40 // ICMP header size(8) + the payload(32)
 #define RCVD_MSG_BUFF 512
 #define FQDN_BUFF 512
-#define MAX_HOPS 30
+#define MAX_HOPS_DEFAULT 30
 #define PACKETS_PER_TTL 3
-#define TIMEOUT_SEC 0
-#define TIMEOUT_MICROSEC 500000
+#define TIMEOUT_SEC_DEFAULT 0
+#define TIMEOUT_MICROSEC_DEFAULT 500000
 int create_socket(struct sockaddr_in* dest_addr)
 {
         // Socket creation
@@ -145,13 +145,13 @@ void reverse_FQDN_resolve(struct sockaddr* node_IP, int node_IP_size, char* FQDN
         }
 }
 
-int packet_timed_out(int sock_fd)
+int packet_timed_out(int sock_fd, int timeout_sec, int timeout_microsec)
 {
         fd_set fds;
         int status;
         struct timeval timeout;
-        timeout.tv_sec = TIMEOUT_SEC;
-        timeout.tv_usec = TIMEOUT_MICROSEC;
+        timeout.tv_sec = timeout_sec;
+        timeout.tv_usec = timeout_microsec;
         FD_ZERO(&fds);
         FD_SET(sock_fd, &fds);
         status = select(sock_fd+1, &fds, NULL, NULL, &timeout);
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
         char packet[ICMP_BUFF]; // ICMP packet buffer(IPv4 payload)
         char rcvd_msg[RCVD_MSG_BUFF];
         char FQDN[FQDN_BUFF]; 
-        char* interface = (argc > 2) ? argv[2] : NULL; 
+        char* interface = NULL; // Default value if interface is not specified 
         struct sockaddr_in dest_IP; 
         struct sockaddr_in node_IP;
         struct timeval time_start;
@@ -182,19 +182,44 @@ int main(int argc, char* argv[])
         int seq_number = 1; // ICMP sequence number
         int first_reply = 1; // To print FQDN and IP address of an intermediate node just once
         int line_overflow = 0; // To keep track of how many packets per TTL value is sent out
+        int timeout_sec = TIMEOUT_SEC_DEFAULT;
+        int timeout_microsec = TIMEOUT_MICROSEC_DEFAULT;
+        int max_hops = MAX_HOPS_DEFAULT;
+        int opt; // For parsing CLI arguments
         long double rtt; // Round trip time
 
-        if(argc > 3 || argc < 2)
+        while ((opt = getopt(argc, argv, "i:m:w:")) != -1) 
         {
-                fprintf(stderr, "Usage: %s <Destination FQDN> [interface]\n", argv[0]);
+                switch (opt) 
+                {
+                case 'i':
+                        interface = optarg;
+                        break;
+                case 'm':
+                        max_hops = atoi(optarg);
+                        break;
+                case 'w':
+                        if (sscanf(optarg, "%d,%d", &timeout_sec, &timeout_microsec) != 2) {
+                        fprintf(stderr, "Invalid timeout format. Use 'sec,microsec' (e.g., 1,200000).\n");
+                        exit(1);
+                        }
+                        break;
+                default:
+                        fprintf(stderr, "Usage: %s -i <interface> -m <max_hops> -w <timeout_sec,timeout_microsec> <destination_fqdn>\n", argv[0]);
+                        exit(1);
+                }
+        }
+
+        if (optind >= argc) {
+                fprintf(stderr, "Usage: %s -i <interface> -m <max_hops> -w <timeout_sec,timeout_microsec> <destination_fqdn>\n", argv[0]);
                 exit(1);
         }
 
-	resolve_FQDN(argv[1], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
-        printf("Destination ip: %s, %d hops max\n", dest_IP_str, MAX_HOPS);
+	resolve_FQDN(argv[optind], &dest_IP, dest_IP_str, sizeof(dest_IP_str));
+        printf("Destination ip: %s, %d hops max, timeout: %d sec, %d microsec\n", dest_IP_str, max_hops, timeout_sec, timeout_microsec);
 
         sock_fd = create_socket(&dest_IP);
-        while(ttl <= MAX_HOPS)
+        while(ttl <= max_hops)
         {
                 printf("%d.\t Reply from ", ttl);
                 for(line_overflow = 0; line_overflow < PACKETS_PER_TTL; line_overflow++)
@@ -202,7 +227,7 @@ int main(int argc, char* argv[])
                         construct_packet(sock_fd, packet, seq_number, ttl, interface);
                         gettimeofday(&time_start, NULL);
                         send_packet(sock_fd, packet, sizeof(packet), (struct sockaddr*)&dest_IP, dest_IP_size);
-                        if(packet_timed_out(sock_fd))
+                        if(packet_timed_out(sock_fd, timeout_sec, timeout_microsec))
                         {
                                 printf("* ");
                         }
