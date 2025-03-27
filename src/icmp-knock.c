@@ -196,22 +196,26 @@ int main(int argc, char* argv[])
                         interface = optarg;
                         break;
                 case 'm':
-                        max_hops = atoi(optarg);
+                        if(sscanf(optarg, "%d", &max_hops) != 1 || max_hops <= 0)
+                        {
+                                fprintf(stderr, "Error: Invalid value for -m [max_hops]. Must be a positive integer.\n");
+                                exit(1);
+                        }
                         break;
                 case 'w':
-                        if (sscanf(optarg, "%d,%d", &timeout_sec, &timeout_microsec) != 2) {
+                        if (sscanf(optarg, "%d,%d", &timeout_sec, &timeout_microsec) != 2 || timeout_sec < 0 || timeout_microsec < 0) {
                         fprintf(stderr, "Invalid timeout format. Use 'sec,microsec' (e.g., 1,200000).\n");
                         exit(1);
                         }
                         break;
                 default:
-                        fprintf(stderr, "Usage: %s -i <interface> -m <max_hops> -w <timeout_sec,timeout_microsec> <destination_fqdn>\n", argv[0]);
+                        fprintf(stderr, "Usage: %s -i [interface] -m [max_hops] -w [timeout_sec,timeout_microsec] <destination>\n", argv[0]);
                         exit(1);
                 }
         }
 
         if (optind >= argc) {
-                fprintf(stderr, "Usage: %s -i <interface> -m <max_hops> -w <timeout_sec,timeout_microsec> <destination_fqdn>\n", argv[0]);
+                fprintf(stderr, "Usage: %s -i [interface] -m [max_hops] -w [timeout_sec,timeout_microsec] <destination>\n", argv[0]);
                 exit(1);
         }
 
@@ -221,7 +225,7 @@ int main(int argc, char* argv[])
         sock_fd = create_socket(&dest_IP);
         while(ttl <= max_hops)
         {
-                printf("%d.\t Reply from ", ttl);
+                printf("%d.\t", ttl);
                 for(line_overflow = 0; line_overflow < PACKETS_PER_TTL; line_overflow++)
                 {
                         construct_packet(sock_fd, packet, seq_number, ttl, interface);
@@ -240,7 +244,7 @@ int main(int argc, char* argv[])
                                 strcpy(src_IP_str, inet_ntoa(node_IP.sin_addr));
                                 if(first_reply)
                                 {
-                                        printf("%s (%s) ", FQDN, src_IP_str);
+                                        printf("Reply from %s (%s) ", FQDN, src_IP_str);
                                         first_reply = 0;
                                 }
                                 printf("%.3Lf ms ", rtt);

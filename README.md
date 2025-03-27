@@ -68,23 +68,22 @@ Usage:
 
 Linux Usage:
 To run icmp-knock, use the following command:
-   ./icmp-knock <destination_FQDN> [interface]
+   ./icmp-knock -i [interface] -m [max_hops] -w [timeout_sec,timeout_microsec] <destination>
 
-   - <destination_FQDN>: The Fully Qualified Domain Name (FQDN) or IP address of the target (e.g., google.com).
+   - <destination>: The Fully Qualified Domain Name (FQDN) or IP address of the target (e.g., google.com).
    - [interface]: (Optional) The network interface to bind to, like eth0 or wlan0. If not specified, the default interface is used.
+   - [max_hops]: (Optional) The maximum number of hops (routers) a packet can make before being dropped. 
+   - [timeout_sec,timeout_microsec]: (Optional) The packet timeout value specified in seconds and microseconds.
 
 Example:
    ./icmp-knock google.com
 
 OpenWRT Usage:
 To run on OpenWRT, use the same command:
-   icmp-knock <destination_FQDN> [interface]
+   icmp-knock -i [interface] -m [max_hops] -w [timeout_sec,timeout_microsec] <destination>
 
 Example:
    icmp-knock google.com
-
-To specify a network interface:
-   icmp-knock google.com eth0
 
 ---
 
@@ -95,7 +94,7 @@ A test script is available to compare the output of icmp-knock with traceroute.
 To run the test script:
 1. Ensure icmp-knock and traceroute are installed.
 2. Run the test script via a makefile target:
-   make test TARGET=<target_FQDN>
+   make test TARGET=<destination>
 
 The script runs both utilities and outputs their results for comparison.
 
